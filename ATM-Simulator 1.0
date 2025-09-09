@@ -1,0 +1,85 @@
+import random
+
+class User:
+    def __init__(self, name: str = None, cpf: str = None, account: str = None, agency: str = None, password: int = None):
+        self.name = name
+        self.cpf = cpf
+        self.__account = account
+        self.__agency = agency
+        self.__password = password
+
+    @property
+    def account(self):
+        return self.__account
+
+    @account.setter
+    def account(self, newAccount):
+        self.__account = newAccount
+
+    @property
+    def agency(self):
+        return self.__agency
+
+    @agency.setter
+    def agency(self, newAgency):
+        self.__agency = newAgency
+
+    @property
+    def password(self):
+        return self.__password
+
+    @password.setter
+    def password(self, newPass):
+        self.__password = newPass
+
+
+class Bank:
+    def __init__(self, user: User, balance: float = 00.00, limit: float = 00.00):
+        self.user = user
+        self.balance = balance
+        self.limit = limit
+    @staticmethod
+    def generationAcc():
+        generationAcc = random.randint(0, 10**7 - 1)
+        dv = random.randint(0, 9)
+        return f"{generationAcc}-{dv}"
+    
+    @staticmethod
+    def generationAgen():
+        generationAgen = random.randint(0, 10**4 - 1)
+        dv = random.randint(0, 9)
+        return f"{generationAgen}-{dv}"
+
+    @staticmethod
+    def generationPass():
+        generationPass = random.randint(0, 10**5 - 1)
+        return generationPass
+
+    def save(self):
+        save = {
+        "Name": self.user.name,
+        "Agency": self.user.agency,
+        "Account": self.user.account,
+        "Password": self.user.password
+    }
+        print(save)
+
+    def create(self, name, cpf):
+        self.user.name = name
+        self.user.cpf = cpf
+        self.user.account = self.generationAcc()
+        self.user.agency = self.generationAgen()
+        self.user.password = self.generationPass()
+        
+    
+    def login(self, cpf, agen, acc, password):
+        if self.user.cpf == cpf and self.user.agency == agen and self.user.account == acc and self.user.password == password:
+            return True
+        return False
+
+
+
+usuario = User()
+bank = Bank(usuario)
+bank.create("Carlos", "76148712947")
+print(bank.save())
