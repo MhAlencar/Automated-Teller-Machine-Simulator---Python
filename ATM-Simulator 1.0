@@ -1,85 +1,330 @@
 import random
+import datetime
 
 class User:
     def __init__(self, name: str = None, cpf: str = None, account: str = None, agency: str = None, password: int = None):
         self.name = name
-        self.cpf = cpf
+        self.__cpf = cpf
         self.__account = account
         self.__agency = agency
         self.__password = password
+
+    @property
+    def cpf(self):
+        return self.__cpf
+
+    @cpf.setter
+    def cpf(self, new_cpf):
+        self.__cpf = new_cpf
 
     @property
     def account(self):
         return self.__account
 
     @account.setter
-    def account(self, newAccount):
-        self.__account = newAccount
+    def account(self, new_account):
+        self.__account = new_account
 
     @property
     def agency(self):
         return self.__agency
 
     @agency.setter
-    def agency(self, newAgency):
-        self.__agency = newAgency
+    def agency(self, new_agency):
+        self.__agency = new_agency
 
     @property
     def password(self):
         return self.__password
 
     @password.setter
-    def password(self, newPass):
-        self.__password = newPass
-
+    def password(self, new_pass):
+        self.__password = new_pass
 
 class Bank:
-    def __init__(self, user: User, balance: float = 00.00, limit: float = 00.00):
+    def __init__(self, user: User, balance: float = 0.00, limit: float = 0.00):
         self.user = user
         self.balance = balance
         self.limit = limit
+        self.transactions = []
+        self.pix_key = None
+
     @staticmethod
     def generationAcc():
-        generationAcc = random.randint(0, 10**7 - 1)
+        generation_acc = random.randint(0, 10**7 - 1)
         dv = random.randint(0, 9)
-        return f"{generationAcc}-{dv}"
-    
+        return f"{generation_acc:07}-{dv}"
+
     @staticmethod
     def generationAgen():
-        generationAgen = random.randint(0, 10**4 - 1)
+        generation_agen = random.randint(0, 10**4 - 1)
         dv = random.randint(0, 9)
-        return f"{generationAgen}-{dv}"
+        return f"{generation_agen:04}-{dv}"
 
     @staticmethod
     def generationPass():
-        generationPass = random.randint(0, 10**5 - 1)
-        return generationPass
+        generation_pass = random.randint(0, 10**5 - 1)
+        return generation_pass
 
-    def save(self):
-        save = {
-        "Name": self.user.name,
-        "Agency": self.user.agency,
-        "Account": self.user.account,
-        "Password": self.user.password
-    }
-        print(save)
+    def record_transaction(self, transaction_type, value):
+        transaction = {
+            'tipo': transaction_type,
+            'valor': value,
+            'data': datetime.date.today().strftime('%d/%m/%Y')
+        }
+        self.transactions.append(transaction)
 
-    def create(self, name, cpf):
-        self.user.name = name
-        self.user.cpf = cpf
-        self.user.account = self.generationAcc()
-        self.user.agency = self.generationAgen()
-        self.user.password = self.generationPass()
-        
-    
-    def login(self, cpf, agen, acc, password):
-        if self.user.cpf == cpf and self.user.agency == agen and self.user.account == acc and self.user.password == password:
+    def consult_balance(self):
+        return self.balance
+
+    def deposit(self, value):
+        self.balance += value
+        self.record_transaction('Depósito', value)
+        print(f"Depósito de R$ {value:.2f} realizado com sucesso.")
+
+    def withdraw(self, value):
+        if value > self.balance + self.limit:
+            print("Saldo e limite insuficientes para realizar a transação.")
+            return
+
+        self.balance -= value
+        self.record_transaction('Saque', value)
+        print(f"Saque de R$ {value:.2f} realizado com sucesso.")
+
+    def change_password(self, new_password):
+        self.user.password = new_password
+        print("Pronto! Sua senha foi alterada com sucesso!")
+
+    def change_limit(self, new_limit):
+        try:
+            new_limit = float(new_limit)
+            self.limit = new_limit
+            print(f"Pronto! Seu novo limite é de: R$ {self.limit:.2f}")
+        except ValueError:
+            print("Valor inválido. O limite não foi alterado.")
+
+    def login(self, agency, account, password):
+        if self.user.agency == agency and self.user.account == account and self.user.password == password:
             return True
         return False
 
+    def create_pix_key(self):
+        if self.pix_key:
+            print(f"Você já tem uma chave Pix cadastrada: {self.pix_key}")
+            return False
+        
+        while True:
+            new_key = input("Digite a chave Pix que deseja cadastrar: ").strip()
+            if new_key:
+                self.pix_key = new_key
+                print(f"Chave Pix '{self.pix_key}' cadastrada com sucesso!")
+                return True
+            else:
+                print("Chave inválida. Por favor, tente novamente.")
 
+    def make_pix(self):
+        if not self.pix_key:
+            print("Você não tem uma chave Pix cadastrada.")
+            return
 
-usuario = User()
-bank = Bank(usuario)
-bank.create("Carlos", "76148712947")
-print(bank.save())
+        try:
+            destination_key = input("Digite a chave Pix de destino: ").strip()
+            amount = float(input("Digite o valor a ser transferido: R$ "))
+        except ValueError:
+            print("Valor inválido. Operação cancelada.")
+            return
+
+        if destination_key == self.pix_key:
+            self.balance += amount
+            self.record_transaction('Pix Recebido', amount)
+            print(f"Pix de R$ {amount:.2f} recebido com sucesso!")
+        
+        else:
+            if amount > self.balance + self.limit:
+                print("Saldo e limite insuficientes para realizar a transação.")
+                return
+
+            self.balance -= amount
+            self.record_transaction('Pix Enviado', -amount)
+            print(f"Pix de R$ {amount:.2f} enviado para a chave '{destination_key}' com sucesso.")
+
+    def handle_pix_operations(self):
+        while True:
+            print("\n" + "="*30)
+            print("           OPERAÇÕES PIX")
+            print("="*30)
+            print("1. Consultar ou Cadastrar Chave Pix")
+            print("2. Fazer Pix")
+            print("3. Voltar ao menu principal")
+            
+            choice = input("Digite a sua opção: ").strip()
+            
+            if choice == '1':
+                if self.pix_key:
+                    print(f"Sua chave Pix atual é: {self.pix_key}")
+                else:
+                    self.create_pix_key()
+            elif choice == '2':
+                self.make_pix()
+            elif choice == '3':
+                print("Voltando ao menu principal.")
+                break
+            else:
+                print("Opção inválida. Tente novamente.")
+
+    def show_statement(self):
+        print("\n" + "="*30)
+        print("           EXTRATO")
+        print("="*30)
+        if not self.transactions:
+            print("Nenhuma transação registrada.")
+        else:
+            for transaction in self.transactions:
+                tipo = transaction['tipo'].ljust(15)
+                valor = f"R$ {transaction['valor']:.2f}".ljust(10)
+                data = transaction['data']
+                print(f"{data} | {tipo} | {valor}")
+        
+        print(f"\nSaldo Atual: R$ {self.balance:.2f}")
+
+class ATM_Controller:
+    def __init__(self):
+        self.users = {}
+        self.logged_in_user = None
+
+    def main_menu(self):
+        while True:
+            choice = input(f"""
++-------------------------------------+
+|         SIMULADOR CAIXA 24H         |
++-------------------------------------+
+
+Para continuar, digite o número da opção desejada:
+
+(1) Acessar minha conta (Login)
+(2) Abrir uma nova conta (Cadastro)
+(3) Fechar o simulador
+
+> """).strip()
+            
+            if choice == '1':
+                self.login()
+            elif choice == '2':
+                self.register()
+            elif choice == '3':
+                print("Obrigado por usar o simulador. Até mais!")
+                break
+            else:
+                print("Opção inválida. Tente novamente.")
+
+    def register(self):
+        while True:
+            name = input("Nome Completo: ").strip()
+            cpf = input("CPF (Somente numeros): ").strip()
+            
+            if not name or not cpf:
+                print("Nome e CPF são obrigatórios.")
+                continue
+
+            if cpf in self.users:
+                print("Este CPF já está cadastrado. Tente fazer login.")
+                continue
+
+            user = User(name, cpf)
+            bank = Bank(user)
+            
+            bank.user.account = bank.generationAcc()
+            bank.user.agency = bank.generationAgen()
+            bank.user.password = bank.generationPass()
+            
+            self.users[cpf] = bank
+            
+            print(f"""
+CONTA CRIADA COM SUCESSO!
+            
+DADOS DA SUA CONTA:
+Nome: {user.name}
+Conta: {user.account}
+Agência: {user.agency}
+Senha: {user.password}
+""")
+            break
+
+    def login(self):
+        while True:
+            print("""
++-------------------------------------+
+|               LOGIN                 |
++-------------------------------------+
+Pressione 'Enter' para continuar ou 'sair' para voltar.
+""")
+            
+            agency = input("Agência: ").strip()
+            if agency.lower() == 'sair': return
+            
+            account = input("Conta: ").strip()
+            if account.lower() == 'sair': return
+            
+            password_str = input("Senha: ").strip()
+            if password_str.lower() == 'sair': return
+            
+            try:
+                password = int(password_str)
+            except ValueError:
+                print("Senha inválida. A senha deve ser um número.")
+                continue
+
+            found_user = None
+            for cpf, bank_instance in self.users.items():
+                if bank_instance.user.agency == agency and bank_instance.user.account == account and bank_instance.user.password == password:
+                    found_user = bank_instance
+                    break
+            
+            if found_user:
+                self.logged_in_user = found_user
+                self.user_menu()
+                break
+            else:
+                print("Dados de login incorretos. Tente novamente.")
+
+    def user_menu(self):
+        while True:
+            bank = self.logged_in_user
+            choice = input(f"""
++-------------------------------------+
+|      CONTA DE {bank.user.name.upper()}     |
++-------------------------------------+
+| Agência: {bank.user.agency} | Conta: {bank.user.account}  |
+| Saldo: R$ {bank.balance:.2f}                  |
++-------------------------------------+
+
+Selecione a operação desejada:
+
+(1) Pix
+(2) Alterar Limite
+(3) Alterar Senha
+(4) Extrato
+(5) Sair da conta
+
+> """).strip()
+
+            if choice == '1':
+                bank.handle_pix_operations()
+            elif choice == '2':
+                new_limit_str = input("Seu limite atual é de R$ {:.2f}, para quanto deseja alterar? R$ ".format(bank.limit))
+                bank.change_limit(new_limit_str)
+            elif choice == '3':
+                new_pass_str = input("Digite sua nova senha: ")
+                bank.change_password(new_pass_str)
+            elif choice == '4':
+                bank.show_statement()
+            elif choice == '5':
+                print("Saindo da conta...")
+                self.logged_in_user = None
+                break
+            else:
+                print("Opção inválida. Tente novamente.")
+
+if __name__ == "__main__":
+    controller = ATM_Controller()
+    controller.main_menu()
