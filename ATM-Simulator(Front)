@@ -1,0 +1,378 @@
+#Codigo realizado por Mário Henrique em Universidade Católica do Tocantins
+
+import tkinter as tk
+from tkinter import messagebox, scrolledtext, simpledialog
+from BackATM import ATM_Controller, User, Bank
+
+# A classe ATM_GUI é a interface gráfica do seu simulador, construída com Tkinter.
+# Ela é responsável por criar a janela, os botões, os campos de entrada e exibir as mensagens.
+# O front-end é completamente separado da lógica de negócio.
+class ATM_GUI:
+    def __init__(self, master):
+        self.master = master
+        master.title("Simulador Caixa 24H")
+        master.geometry("500x600")
+        master.configure(bg="#054F77") # Cor de fundo principal
+
+        self.controller = ATM_Controller()
+
+        # Criação do usuário de teste para agilizar o processo de desenvolvimento e testes.
+        # Os dados são inseridos diretamente para que não seja necessário criar uma nova conta a cada execução.
+        test_user_obj = User("Mário Henrique", "00000000000", "0000000-0", "1234-5", 1234)
+        test_bank_obj = Bank(test_user_obj, balance=1500.00, limit=500.00)
+        test_bank_obj.pix_key = "teste@teste.com"
+        self.controller.users["00000000000"] = test_bank_obj
+        
+        # Criação dos frames, que atuam como "telas" da aplicação.
+        # Cada frame contém os widgets (botões, rótulos) de uma tela específica.
+        self.login_frame = self.create_styled_frame()
+        self.register_frame = self.create_styled_frame()
+        self.main_menu_frame = self.create_styled_frame()
+        self.pix_menu_frame = self.create_styled_frame()
+        self.pix_send_frame = self.create_styled_frame()
+        self.deposit_withdraw_frame = self.create_styled_frame()
+        self.statement_frame = self.create_styled_frame()
+        self.change_limit_frame = self.create_styled_frame()
+        self.change_password_frame = self.create_styled_frame()
+
+        # Chamada para criar os widgets em cada frame.
+        self.create_login_widgets()
+        self.create_register_widgets()
+        self.create_main_menu_widgets()
+        self.create_pix_menu_widgets()
+        self.create_pix_send_widgets()
+        self.create_deposit_withdraw_widgets()
+        self.create_statement_widgets()
+        self.create_change_limit_widgets()
+        self.create_change_password_widgets()
+
+        # Inicia a aplicação exibindo a tela de login.
+        self.show_login()
+        
+    def create_styled_frame(self):
+        """Cria um frame padrão, com cor de fundo e preenchimento."""
+        return tk.Frame(self.master, bg="#054F77", padx=20, pady=20)
+
+    # Função para gerenciar qual tela é exibida.
+    # Ela esconde todas as telas e exibe apenas a que foi selecionada.
+    def show_frame(self, frame):
+        for f in self.master.winfo_children():
+            f.pack_forget()
+        frame.pack(expand=True, fill="both")
+
+    # --- Widgets de Login ---
+    # Cria os elementos visuais para a tela de login.
+    def create_login_widgets(self):
+        # A fonte "Inter" não está disponível por padrão no Tkinter. Usamos "Helvetica" como uma fonte sem serifa limpa.
+        # Caso queira usar a fonte "Inter" em um ambiente real, você pode precisar instalá-la no sistema e configurar o Tkinter para reconhecê-la.
+        
+        tk.Label(self.login_frame, text="SIMULADOR CAIXA 24H", font=("Helvetica", 20, "bold"), bg="#054F77", fg="white").pack(pady=10)
+        tk.Label(self.login_frame, text="ACESSO À CONTA", font=("Helvetica", 14), bg="#054F77", fg="white").pack(pady=5)
+        
+        tk.Label(self.login_frame, text="Agência:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.agency_entry = tk.Entry(self.login_frame, width=30, font=("Helvetica", 12))
+        self.agency_entry.pack()
+        
+        tk.Label(self.login_frame, text="Conta:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.account_entry = tk.Entry(self.login_frame, width=30, font=("Helvetica", 12))
+        self.account_entry.pack()
+        
+        tk.Label(self.login_frame, text="Senha:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.password_entry = tk.Entry(self.login_frame, show="*", width=30, font=("Helvetica", 12))
+        self.password_entry.pack()
+        
+        # O "command" de cada botão chama um método da classe, que fará a
+        # comunicação com o back-end para realizar a operação.
+        tk.Button(self.login_frame, text="Entrar", command=self.handle_login, width=20, bg="white", fg="#054F77", font=("Helvetica", 12, "bold"), relief="flat", bd=0, highlightthickness=0).pack(pady=20)
+        tk.Button(self.login_frame, text="Abrir uma nova conta", command=self.show_register, width=20, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack()
+        
+        tk.Button(self.login_frame, text="Acessar Conta de Teste", command=self.login_as_test_user, width=20, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=10)
+
+    # Método acionado pelo botão "Entrar".
+    # Pega os dados dos campos, chama o método de login do back-end
+    # e exibe o resultado para o usuário.
+    def handle_login(self):
+        agency = self.agency_entry.get()
+        account = self.account_entry.get()
+        password = self.password_entry.get()
+        
+        self.agency_entry.delete(0, tk.END)
+        self.account_entry.delete(0, tk.END)
+        self.password_entry.delete(0, tk.END)
+        
+        try:
+            password = int(password)
+        except ValueError:
+            messagebox.showerror("Erro de Login", "A senha deve conter apenas números.")
+            return
+        
+        success, message = self.controller.login_gui(agency, account, password)
+        
+        if success:
+            self.show_main_menu()
+        else:
+            messagebox.showerror("Erro de Login", message)
+            
+    # Método para o botão de acesso rápido à conta de teste.
+    def login_as_test_user(self):
+        success, message = self.controller.login_gui("1234-5", "0000000-0", 1234)
+        if success:
+            self.show_main_menu()
+        else:
+            messagebox.showerror("Erro de Login", "Erro ao acessar a conta de teste.")
+
+    def show_login(self):
+        self.show_frame(self.login_frame)
+
+    # --- Widgets de Cadastro ---
+    def create_register_widgets(self):
+        tk.Label(self.register_frame, text="SIMULADOR CAIXA 24H", font=("Helvetica", 20, "bold"), bg="#054F77", fg="white").pack(pady=10)
+        tk.Label(self.register_frame, text="CADASTRO", font=("Helvetica", 14), bg="#054F77", fg="white").pack(pady=5)
+        
+        tk.Label(self.register_frame, text="Nome Completo:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.name_entry = tk.Entry(self.register_frame, width=30, font=("Helvetica", 12))
+        self.name_entry.pack()
+        
+        tk.Label(self.register_frame, text="CPF (somente números):", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.cpf_entry = tk.Entry(self.register_frame, width=30, font=("Helvetica", 12))
+        self.cpf_entry.pack()
+        
+        tk.Button(self.register_frame, text="Cadastrar", command=self.handle_register, width=20, bg="white", fg="#054F77", font=("Helvetica", 12, "bold"), relief="flat", bd=0, highlightthickness=0).pack(pady=20)
+        tk.Button(self.register_frame, text="Já tenho conta", command=self.show_login, width=20, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack()
+
+    def handle_register(self):
+        name = self.name_entry.get()
+        cpf = self.cpf_entry.get()
+        success, message, user_data = self.controller.register_gui(name, cpf)
+        
+        if success:
+            info_message = (
+                f"{message}\n\n"
+                f"Guarde seus dados de login:\n\n"
+                f"Agência: {user_data['agencia']}\n"
+                f"Conta: {user_data['conta']}\n"
+                f"Senha: {user_data['senha']}"
+            )
+            messagebox.showinfo("Cadastro Concluído", info_message)
+            self.show_login()
+        else:
+            messagebox.showerror("Erro de Cadastro", message)
+
+    def show_register(self):
+        self.show_frame(self.register_frame)
+
+    # --- Widgets do Menu Principal ---
+    def create_main_menu_widgets(self):
+        self.user_info_label = tk.Label(self.main_menu_frame, text="", font=("Helvetica", 12, "bold"), bg="#054F77", fg="white", justify="left", relief="flat", bd=0)
+        self.user_info_label.pack(pady=10, fill="x", padx=10)
+        
+        tk.Label(self.main_menu_frame, text="MENU PRINCIPAL", font=("Helvetica", 14, "bold"), bg="#054F77", fg="white").pack(pady=10)
+        
+        tk.Button(self.main_menu_frame, text="Depósito/Saque", command=self.show_deposit_withdraw, width=30, height=2, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+        tk.Button(self.main_menu_frame, text="Pix", command=self.show_pix_menu, width=30, height=2, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+        tk.Button(self.main_menu_frame, text="Extrato", command=self.show_statement, width=30, height=2, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+        tk.Button(self.main_menu_frame, text="Alterar Limite", command=self.show_change_limit, width=30, height=2, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+        tk.Button(self.main_menu_frame, text="Alterar Senha", command=self.show_change_password, width=30, height=2, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+        tk.Button(self.main_menu_frame, text="Sair da Conta", command=self.handle_logout, width=30, height=2, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+
+    def update_main_menu_info(self):
+        user_data = self.controller.get_user_data()
+        if user_data:
+            info_text = (
+                f"Nome: {user_data['name']}\n"
+                f"Agência: {user_data['agency']}\n"
+                f"Conta: {user_data['account']}\n"
+                f"Saldo: R$ {user_data['balance']:.2f}\n"
+                f"Limite: R$ {user_data['limit']:.2f}"
+            )
+            self.user_info_label.config(text=info_text)
+
+    # Exibe a tela principal após o login, atualizando os dados do usuário.
+    def show_main_menu(self):
+        self.update_main_menu_info()
+        self.show_frame(self.main_menu_frame)
+
+    def handle_logout(self):
+        self.controller.logged_in_user = None
+        self.show_login()
+
+    # --- Widgets de Depósito/Saque ---
+    def create_deposit_withdraw_widgets(self):
+        tk.Label(self.deposit_withdraw_frame, text="Depósito/Saque", font=("Helvetica", 14, "bold"), bg="#054F77", fg="white").pack(pady=20)
+        tk.Label(self.deposit_withdraw_frame, text="Valor:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.dw_amount_entry = tk.Entry(self.deposit_withdraw_frame, width=30, font=("Helvetica", 12))
+        self.dw_amount_entry.pack()
+        
+        tk.Button(self.deposit_withdraw_frame, text="Depositar", command=self.handle_deposit, width=20, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=10)
+        tk.Button(self.deposit_withdraw_frame, text="Sacar", command=self.handle_withdraw, width=20, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+        tk.Button(self.deposit_withdraw_frame, text="Voltar", command=self.show_main_menu, width=20, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=20)
+
+    def handle_deposit(self):
+        try:
+            amount = float(self.dw_amount_entry.get())
+            success, message = self.controller.deposit(amount)
+            if success:
+                messagebox.showinfo("Sucesso", message)
+                self.dw_amount_entry.delete(0, tk.END)
+                self.update_main_menu_info()
+            else:
+                messagebox.showerror("Erro", message)
+        except ValueError:
+            messagebox.showerror("Erro", "Por favor, insira um valor numérico.")
+
+    def handle_withdraw(self):
+        try:
+            amount = float(self.dw_amount_entry.get())
+            success, message = self.controller.withdraw(amount)
+            if success:
+                messagebox.showinfo("Sucesso", message)
+                self.dw_amount_entry.delete(0, tk.END)
+                self.update_main_menu_info()
+            else:
+                messagebox.showerror("Erro", message)
+        except ValueError:
+            messagebox.showerror("Erro", "Por favor, insira um valor numérico.")
+
+    def show_deposit_withdraw(self):
+        self.show_frame(self.deposit_withdraw_frame)
+
+    # --- Widgets do Menu Pix ---
+    def create_pix_menu_widgets(self):
+        tk.Label(self.pix_menu_frame, text="OPERAÇÕES PIX", font=("Helvetica", 14, "bold"), bg="#054F77", fg="white").pack(pady=20)
+        tk.Button(self.pix_menu_frame, text="Consultar/Cadastrar Chave", command=self.handle_pix_key, width=30, height=2, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+        tk.Button(self.pix_menu_frame, text="Fazer Pix", command=self.show_pix_send, width=30, height=2, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=5)
+        tk.Button(self.pix_menu_frame, text="Voltar", command=self.show_main_menu, width=30, height=2, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=20)
+
+    def handle_pix_key(self):
+        current_pix_key = self.controller.logged_in_user.pix_key
+        if current_pix_key:
+            messagebox.showinfo("Chave Pix", f"Sua chave Pix atual é: {current_pix_key}")
+        else:
+            new_key = simpledialog.askstring("Cadastrar Chave Pix", "Digite a chave Pix que deseja cadastrar:")
+            if new_key:
+                success, message = self.controller.logged_in_user.create_pix_key(new_key)
+                if success:
+                    messagebox.showinfo("Sucesso", message)
+                else:
+                    messagebox.showerror("Erro", message)
+    
+    def show_pix_menu(self):
+        self.show_frame(self.pix_menu_frame)
+
+    # --- Widgets de Envio de Pix ---
+    def create_pix_send_widgets(self):
+        tk.Label(self.pix_send_frame, text="FAZER PIX", font=("Helvetica", 14, "bold"), bg="#054F77", fg="white").pack(pady=20)
+        tk.Label(self.pix_send_frame, text="Chave de Destino:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.pix_key_entry = tk.Entry(self.pix_send_frame, width=30, font=("Helvetica", 12))
+        self.pix_key_entry.pack()
+        tk.Label(self.pix_send_frame, text="Valor:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.pix_amount_entry = tk.Entry(self.pix_send_frame, width=30, font=("Helvetica", 12))
+        self.pix_amount_entry.pack()
+        tk.Button(self.pix_send_frame, text="Enviar Pix", command=self.handle_send_pix, width=20, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=10)
+        tk.Button(self.pix_send_frame, text="Voltar", command=self.show_pix_menu, width=20, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=20)
+
+    def handle_send_pix(self):
+        destination_key = self.pix_key_entry.get()
+        amount_str = self.pix_amount_entry.get()
+
+        try:
+            amount = float(amount_str)
+            success, message = self.controller.logged_in_user.make_pix(destination_key, amount)
+            if success:
+                messagebox.showinfo("Sucesso", message)
+                self.pix_key_entry.delete(0, tk.END)
+                self.pix_amount_entry.delete(0, tk.END)
+                self.update_main_menu_info()
+                self.show_main_menu()
+            else:
+                messagebox.showerror("Erro", message)
+        except ValueError:
+            messagebox.showerror("Erro", "Valor inválido. Por favor, insira um valor numérico.")
+
+    def show_pix_send(self):
+        self.show_frame(self.pix_send_frame)
+
+    # --- Widgets do Extrato ---
+    def create_statement_widgets(self):
+        tk.Label(self.statement_frame, text="EXTRATO", font=("Helvetica", 14, "bold"), bg="#054F77", fg="white").pack(pady=10)
+        self.statement_text = scrolledtext.ScrolledText(self.statement_frame, wrap=tk.WORD, width=50, height=20, font=("Courier", 10))
+        self.statement_text.pack(pady=10)
+        tk.Button(self.statement_frame, text="Voltar", command=self.show_main_menu, width=20, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=10)
+
+    def show_statement(self):
+        self.statement_text.delete(1.0, tk.END)
+        transactions, balance = self.controller.get_statement()
+        if not transactions:
+            self.statement_text.insert(tk.END, "Nenhuma transação registrada.")
+        else:
+            self.statement_text.insert(tk.END, "Data         | Tipo            | Valor\n")
+            self.statement_text.insert(tk.END, "-------------------------------------\n")
+            for t in transactions:
+                line = f"{t['data']} | {t['tipo'].ljust(15)} | R$ {t['valor']:.2f}\n"
+                self.statement_text.insert(tk.END, line)
+        
+        self.statement_text.insert(tk.END, f"\nSaldo Atual: R$ {balance:.2f}")
+        self.show_frame(self.statement_frame)
+
+    # --- Widgets de Alterar Limite ---
+    def create_change_limit_widgets(self):
+        tk.Label(self.change_limit_frame, text="ALTERAR LIMITE", font=("Helvetica", 14, "bold"), bg="#054F77", fg="white").pack(pady=20)
+        self.current_limit_label = tk.Label(self.change_limit_frame, text="", bg="#054F77", fg="white", font=("Helvetica", 12))
+        self.current_limit_label.pack(pady=(10, 0))
+        
+        tk.Label(self.change_limit_frame, text="Novo Limite:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.new_limit_entry = tk.Entry(self.change_limit_frame, width=30, font=("Helvetica", 12))
+        self.new_limit_entry.pack()
+        
+        tk.Button(self.change_limit_frame, text="Confirmar", command=self.handle_change_limit, width=20, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=10)
+        tk.Button(self.change_limit_frame, text="Voltar", command=self.show_main_menu, width=20, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=20)
+
+    def handle_change_limit(self):
+        new_limit = self.new_limit_entry.get()
+        success, message = self.controller.change_limit(new_limit)
+        
+        if success:
+            messagebox.showinfo("Sucesso", message)
+            self.new_limit_entry.delete(0, tk.END)
+            self.update_main_menu_info()
+            self.show_main_menu()
+        else:
+            messagebox.showerror("Erro", message)
+
+    def show_change_limit(self):
+        self.update_main_menu_info()
+        user_data = self.controller.get_user_data()
+        self.current_limit_label.config(text=f"Limite atual: R$ {user_data['limit']:.2f}")
+        self.show_frame(self.change_limit_frame)
+
+    # --- Widgets de Alterar Senha ---
+    def create_change_password_widgets(self):
+        tk.Label(self.change_password_frame, text="ALTERAR SENHA", font=("Helvetica", 14, "bold"), bg="#054F77", fg="white").pack(pady=20)
+        tk.Label(self.change_password_frame, text="Nova Senha:", bg="#054F77", fg="white", font=("Helvetica", 12)).pack(pady=(10, 0))
+        self.new_password_entry = tk.Entry(self.change_password_frame, show="*", width=30, font=("Helvetica", 12))
+        self.new_password_entry.pack()
+        
+        tk.Button(self.change_password_frame, text="Confirmar", command=self.handle_change_password, width=20, bg="white", fg="#054F77", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=10)
+        tk.Button(self.change_password_frame, text="Voltar", command=self.show_main_menu, width=20, bg="#054F77", fg="white", font=("Helvetica", 12), relief="flat", bd=0, highlightthickness=0).pack(pady=20)
+
+    def handle_change_password(self):
+        new_password = self.new_password_entry.get()
+        try:
+            new_password = int(new_password)
+            success, message = self.controller.change_password(new_password)
+            if success:
+                messagebox.showinfo("Sucesso", message)
+                self.new_password_entry.delete(0, tk.END)
+                self.show_main_menu()
+            else:
+                messagebox.showerror("Erro", message)
+        except ValueError:
+            messagebox.showerror("Erro", "A senha deve conter apenas números.")
+
+    def show_change_password(self):
+        self.show_frame(self.change_password_frame)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ATM_GUI(root)
+    root.mainloop()
