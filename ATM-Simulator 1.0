@@ -1,6 +1,12 @@
+#Codigo realizado por Mário Henrique em Universidade Católica do Tocantins
+
 import random
 import datetime
+import re
 
+# Esta classe armazena os dados do cliente e utiliza "properties" para encapsulamento
+# O encapsulamento impede que dados sensíveis, como senha e CPF, sejam alterados
+# de forma acidental ou indevida.
 class User:
     def __init__(self, name: str = None, cpf: str = None, account: str = None, agency: str = None, password: int = None):
         self.name = name
@@ -9,6 +15,10 @@ class User:
         self.__agency = agency
         self.__password = password
 
+    # Decorator @property: permite acessar um método como se fosse um atributo
+    # sem precisar usar parênteses, por exemplo, `user.cpf`.
+    # Decorator @setter: permite modificar o valor de um atributo encapsulado,
+    # como `user.cpf = "novo_cpf"`.
     @property
     def cpf(self):
         return self.__cpf
@@ -41,6 +51,8 @@ class User:
     def password(self, new_pass):
         self.__password = new_pass
 
+# Esta classe contém toda a lógica bancária e das operações,
+# como geração de credenciais, transações e validações.
 class Bank:
     def __init__(self, user: User, balance: float = 0.00, limit: float = 0.00):
         self.user = user
@@ -49,6 +61,8 @@ class Bank:
         self.transactions = []
         self.pix_key = None
 
+    # O decorator @staticmethod indica que o método não depende de uma instância da classe.
+    # Ele pode ser chamado diretamente da classe, como `Bank.generationAcc()`.
     @staticmethod
     def generationAcc():
         generation_acc = random.randint(0, 10**7 - 1)
@@ -66,6 +80,8 @@ class Bank:
         generation_pass = random.randint(0, 10**5 - 1)
         return generation_pass
 
+    # Função para registrar todas as operações da conta no extrato.
+    # O valor é registrado como negativo para saques e Pix enviados.
     def record_transaction(self, transaction_type, value):
         transaction = {
             'tipo': transaction_type,
@@ -74,257 +90,156 @@ class Bank:
         }
         self.transactions.append(transaction)
 
-    def consult_balance(self):
-        return self.balance
-
+    # Funções de transação, que retornam True/False e uma mensagem de status.
+    # Essa abordagem facilita a comunicação com o front-end.
     def deposit(self, value):
         self.balance += value
         self.record_transaction('Depósito', value)
-        print(f"Depósito de R$ {value:.2f} realizado com sucesso.")
+        return True, "Depósito realizado com sucesso."
 
     def withdraw(self, value):
         if value > self.balance + self.limit:
-            print("Saldo e limite insuficientes para realizar a transação.")
-            return
-
+            return False, "Saldo e limite insuficientes para realizar a transação."
         self.balance -= value
-        self.record_transaction('Saque', value)
-        print(f"Saque de R$ {value:.2f} realizado com sucesso.")
+        self.record_transaction('Saque', -value)
+        return True, "Saque realizado com sucesso."
 
     def change_password(self, new_password):
-        self.user.password = new_password
-        print("Pronto! Sua senha foi alterada com sucesso!")
+        try:
+            new_password = int(new_password)
+            self.user.password = new_password
+            return True, "Pronto! Sua senha foi alterada com sucesso!"
+        except ValueError:
+            return False, "A senha deve conter apenas números."
 
     def change_limit(self, new_limit):
         try:
             new_limit = float(new_limit)
             self.limit = new_limit
-            print(f"Pronto! Seu novo limite é de: R$ {self.limit:.2f}")
+            return True, f"Pronto! Seu novo limite é de: R$ {self.limit:.2f}"
         except ValueError:
-            print("Valor inválido. O limite não foi alterado.")
-
-    def login(self, agency, account, password):
-        if self.user.agency == agency and self.user.account == account and self.user.password == password:
+            return False, "Valor inválido. O limite não foi alterado."
+            
+    # Função para validar o formato de uma chave Pix (email, telefone ou CPF).
+    # O método utiliza expressões regulares para garantir que o formato é válido.
+    def validate_pix_key(self, pix_key):
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        phone_regex = r'^\+?\d{2,3}\d{9,11}$'
+        cpf_regex = r'^\d{11}$'
+        
+        if re.match(email_regex, pix_key) or re.match(phone_regex, pix_key) or re.match(cpf_regex, pix_key):
             return True
         return False
 
-    def create_pix_key(self):
-        if self.pix_key:
-            print(f"Você já tem uma chave Pix cadastrada: {self.pix_key}")
-            return False
-        
-        while True:
-            new_key = input("Digite a chave Pix que deseja cadastrar: ").strip()
-            if new_key:
-                self.pix_key = new_key
-                print(f"Chave Pix '{self.pix_key}' cadastrada com sucesso!")
-                return True
-            else:
-                print("Chave inválida. Por favor, tente novamente.")
+    def create_pix_key(self, new_key):
+        if not self.validate_pix_key(new_key):
+            return False, "Chave Pix inválida. Use um formato de e-mail, telefone ou CPF."
+        self.pix_key = new_key
+        return True, f"Chave Pix '{self.pix_key}' cadastrada com sucesso!"
 
-    def make_pix(self):
+    def make_pix(self, destination_key, amount):
         if not self.pix_key:
-            print("Você não tem uma chave Pix cadastrada.")
-            return
+            return False, "Você não tem uma chave Pix cadastrada."
 
-        try:
-            destination_key = input("Digite a chave Pix de destino: ").strip()
-            amount = float(input("Digite o valor a ser transferido: R$ "))
-        except ValueError:
-            print("Valor inválido. Operação cancelada.")
-            return
+        if not self.validate_pix_key(destination_key):
+            return False, "Chave de destino inválida."
 
         if destination_key == self.pix_key:
             self.balance += amount
             self.record_transaction('Pix Recebido', amount)
-            print(f"Pix de R$ {amount:.2f} recebido com sucesso!")
+            return True, f"Pix de R$ {amount:.2f} recebido com sucesso!"
         
         else:
             if amount > self.balance + self.limit:
-                print("Saldo e limite insuficientes para realizar a transação.")
-                return
+                return False, "Saldo e limite insuficientes para realizar a transação."
 
             self.balance -= amount
             self.record_transaction('Pix Enviado', -amount)
-            print(f"Pix de R$ {amount:.2f} enviado para a chave '{destination_key}' com sucesso.")
+            return True, f"Pix de R$ {amount:.2f} enviado para a chave '{destination_key}' com sucesso."
 
-    def handle_pix_operations(self):
-        while True:
-            print("\n" + "="*30)
-            print("           OPERAÇÕES PIX")
-            print("="*30)
-            print("1. Consultar ou Cadastrar Chave Pix")
-            print("2. Fazer Pix")
-            print("3. Voltar ao menu principal")
-            
-            choice = input("Digite a sua opção: ").strip()
-            
-            if choice == '1':
-                if self.pix_key:
-                    print(f"Sua chave Pix atual é: {self.pix_key}")
-                else:
-                    self.create_pix_key()
-            elif choice == '2':
-                self.make_pix()
-            elif choice == '3':
-                print("Voltando ao menu principal.")
-                break
-            else:
-                print("Opção inválida. Tente novamente.")
+    def get_statement(self):
+        return self.transactions, self.balance
 
-    def show_statement(self):
-        print("\n" + "="*30)
-        print("           EXTRATO")
-        print("="*30)
-        if not self.transactions:
-            print("Nenhuma transação registrada.")
-        else:
-            for transaction in self.transactions:
-                tipo = transaction['tipo'].ljust(15)
-                valor = f"R$ {transaction['valor']:.2f}".ljust(10)
-                data = transaction['data']
-                print(f"{data} | {tipo} | {valor}")
-        
-        print(f"\nSaldo Atual: R$ {self.balance:.2f}")
-
+# Esta classe gerencia o fluxo de controle da aplicação.
+# Ela atua como a ponte entre a lógica de negócio (Bank) e a interface gráfica (GUI).
+# O sistema de usuários é gerenciado aqui.
 class ATM_Controller:
     def __init__(self):
         self.users = {}
         self.logged_in_user = None
 
-    def main_menu(self):
-        while True:
-            choice = input(f"""
-+-------------------------------------+
-|         SIMULADOR CAIXA 24H         |
-+-------------------------------------+
+    # Métodos que recebem os dados do front-end e retornam o resultado
+    # para serem exibidos na interface.
+    def register_gui(self, name, cpf):
+        if not name or not cpf:
+            return False, "Nome e CPF são obrigatórios.", None
 
-Para continuar, digite o número da opção desejada:
+        if not cpf.isdigit() or len(cpf) != 11:
+            return False, "CPF inválido. Deve conter 11 dígitos numéricos.", None
 
-(1) Acessar minha conta (Login)
-(2) Abrir uma nova conta (Cadastro)
-(3) Fechar o simulador
+        if cpf in self.users:
+            return False, "Este CPF já está cadastrado.", None
 
-> """).strip()
-            
-            if choice == '1':
-                self.login()
-            elif choice == '2':
-                self.register()
-            elif choice == '3':
-                print("Obrigado por usar o simulador. Até mais!")
-                break
-            else:
-                print("Opção inválida. Tente novamente.")
+        user = User(name, cpf)
+        bank = Bank(user)
+        
+        bank.user.account = bank.generationAcc()
+        bank.user.agency = bank.generationAgen()
+        bank.user.password = bank.generationPass()
+        
+        self.users[cpf] = bank
+        
+        user_data = {
+            "agencia": bank.user.agency,
+            "conta": bank.user.account,
+            "senha": bank.user.password
+        }
+        return True, "Conta criada com sucesso!", user_data
 
-    def register(self):
-        while True:
-            name = input("Nome Completo: ").strip()
-            cpf = input("CPF (Somente numeros): ").strip()
-            
-            if not name or not cpf:
-                print("Nome e CPF são obrigatórios.")
-                continue
+    def login_gui(self, agency, account, password):
+        try:
+            password = int(password)
+        except ValueError:
+            return False, "A senha deve conter apenas números."
 
-            if cpf in self.users:
-                print("Este CPF já está cadastrado. Tente fazer login.")
-                continue
+        for cpf, bank_instance in self.users.items():
+            if bank_instance.user.agency == agency and bank_instance.user.account == account and bank_instance.user.password == password:
+                self.logged_in_user = bank_instance
+                return True, "Login bem-sucedido."
+        
+        return False, "Dados de login incorretos. Tente novamente."
 
-            user = User(name, cpf)
-            bank = Bank(user)
-            
-            bank.user.account = bank.generationAcc()
-            bank.user.agency = bank.generationAgen()
-            bank.user.password = bank.generationPass()
-            
-            self.users[cpf] = bank
-            
-            print(f"""
-CONTA CRIADA COM SUCESSO!
-            
-DADOS DA SUA CONTA:
-Nome: {user.name}
-Conta: {user.account}
-Agência: {user.agency}
-Senha: {user.password}
-""")
-            break
+    # Método para o front-end obter os dados do usuário logado.
+    def get_user_data(self):
+        if self.logged_in_user:
+            return {
+                "name": self.logged_in_user.user.name,
+                "agency": self.logged_in_user.user.agency,
+                "account": self.logged_in_user.user.account,
+                "balance": self.logged_in_user.balance,
+                "limit": self.logged_in_user.limit
+            }
+        return None
+    
+    # As funções abaixo são apenas atalhos para os métodos da classe Bank,
+    # usados para simplificar a chamada no front-end.
+    def deposit(self, amount):
+        return self.logged_in_user.deposit(amount)
 
-    def login(self):
-        while True:
-            print("""
-+-------------------------------------+
-|               LOGIN                 |
-+-------------------------------------+
-Pressione 'Enter' para continuar ou 'sair' para voltar.
-""")
-            
-            agency = input("Agência: ").strip()
-            if agency.lower() == 'sair': return
-            
-            account = input("Conta: ").strip()
-            if account.lower() == 'sair': return
-            
-            password_str = input("Senha: ").strip()
-            if password_str.lower() == 'sair': return
-            
-            try:
-                password = int(password_str)
-            except ValueError:
-                print("Senha inválida. A senha deve ser um número.")
-                continue
+    def withdraw(self, amount):
+        return self.logged_in_user.withdraw(amount)
 
-            found_user = None
-            for cpf, bank_instance in self.users.items():
-                if bank_instance.user.agency == agency and bank_instance.user.account == account and bank_instance.user.password == password:
-                    found_user = bank_instance
-                    break
-            
-            if found_user:
-                self.logged_in_user = found_user
-                self.user_menu()
-                break
-            else:
-                print("Dados de login incorretos. Tente novamente.")
+    def change_password(self, new_password):
+        return self.logged_in_user.change_password(new_password)
 
-    def user_menu(self):
-        while True:
-            bank = self.logged_in_user
-            choice = input(f"""
-+-------------------------------------+
-|      CONTA DE {bank.user.name.upper()}     |
-+-------------------------------------+
-| Agência: {bank.user.agency} | Conta: {bank.user.account}  |
-| Saldo: R$ {bank.balance:.2f}                  |
-+-------------------------------------+
+    def change_limit(self, new_limit):
+        return self.logged_in_user.change_limit(new_limit)
 
-Selecione a operação desejada:
-
-(1) Pix
-(2) Alterar Limite
-(3) Alterar Senha
-(4) Extrato
-(5) Sair da conta
-
-> """).strip()
-
-            if choice == '1':
-                bank.handle_pix_operations()
-            elif choice == '2':
-                new_limit_str = input("Seu limite atual é de R$ {:.2f}, para quanto deseja alterar? R$ ".format(bank.limit))
-                bank.change_limit(new_limit_str)
-            elif choice == '3':
-                new_pass_str = input("Digite sua nova senha: ")
-                bank.change_password(new_pass_str)
-            elif choice == '4':
-                bank.show_statement()
-            elif choice == '5':
-                print("Saindo da conta...")
-                self.logged_in_user = None
-                break
-            else:
-                print("Opção inválida. Tente novamente.")
-
-if __name__ == "__main__":
-    controller = ATM_Controller()
-    controller.main_menu()
+    def get_statement(self):
+        return self.logged_in_user.get_statement()
+    
+    def create_pix_key(self, new_key):
+        return self.logged_in_user.create_pix_key(new_key)
+    
+    def make_pix(self, destination_key, amount):
+        return self.logged_in_user.make_pix(destination_key, amount)
